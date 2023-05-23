@@ -1,6 +1,9 @@
 import os
+import re
 import shutil
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 def dataloader(
@@ -28,17 +31,47 @@ def dataloader(
     info.to_excel(os.path.join(export_dir, 'info.xlsx'), index=True)
     print(info)
 
+    df['file_dir'] = df['Path'].str.split('/').str[-1].str.extract(r'(\d{3}_sheep_.{2})')
+    df['map'] = df['Dataset'].notna().astype(int)
+
+    # heatmap
+    df_map = df.pivot("Slide_number", "file_dir", "map")
+    fig = plt.figure(facecolor=(0.7, 0.7, 0.7), figsize=(20, 5))
+    ax = sns.heatmap(df_map, cmap='winter', cbar=False)
+    ax.set_facecolor((0.1, 0.1, 0.1))
+    ax.invert_yaxis()
+    x_ticks = range(len(df_map.columns))
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels(df_map.columns, rotation=90, fontsize=8)
+    plt.tight_layout()
+    plt.savefig(os.path.join(export_dir, 'dataset_heatmap.png'), dpi=300, bbox_inches='tight')
+
+    # del NaN rows
+    df = df[df['map'] == 1]
+    df.to_excel(os.path.join(export_dir, 'df_info.xlsx'), index=True)
+
     for data_class in data_classes.index:
         print(data_class)
         export_dir_class = os.path.join(export_dir, data_class)
         os.makedirs(export_dir_class, exist_ok=True)
 
         files = df[df['Dataset'] == data_class]['Filename']
-        for file in files:
-            dirpath = df[df['Filename'] == file]['Path'].iloc[0]
-            filepath = os.path.join(dirpath, file)
-            shutil.copy(filepath, export_dir_class)
-            print(f"File '{file}' copied to '{export_dir_class}'.")
+
+        for id in files.index:
+            # old file path
+            dataset_path = df.loc[id, 'Path']
+            file = df.loc[id, 'Filename']
+            dataset_file_path = os.path.join(dataset_path, file)
+
+            # new file path
+            file_pref = df.loc[id, 'file_dir']
+            file_num = int(re.findall(r'slide_(\d+)_res', file)[0])
+            file_type = file.split('.')[-1]
+            nfile = f'{file_pref}_slide_{file_num :04d}.{file_type}'
+            export_dir_file_path = os.path.join(export_dir_class, nfile)
+
+            shutil.copy(dataset_file_path, export_dir_file_path)
+            print(f"File '{nfile}' copied to '{export_dir_class}'.")
 
 
 if __name__ == '__main__':
