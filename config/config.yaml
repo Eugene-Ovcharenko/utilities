@@ -1,0 +1,5 @@
+data_folder: '/media/nii/SP PHD U3/dataset/source'
+image_width: 3000
+image_height: 3000
+save_cut_images: True
+export_format: png
