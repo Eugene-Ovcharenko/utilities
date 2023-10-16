@@ -1,74 +1,55 @@
 import os
 import re
+import shutil
 import pandas as pd
+import warnings
 
-pd.options.mode.chained_assignment = None
-
-
-def get_directory_size(
-        path: str
-) -> float:
-    """
-    Calculate the total size of a directory and its contents in Mb.
-
-    Args:
-        path (str): The path to the directory.
-
-    Returns:
-        float: The total size of the directory and its contents in Mb.
-    """
-
-    total_size = 0
-    with os.scandir(path) as it:
-        for entry in it:
-            if entry.is_file():
-                total_size += entry.stat().st_size
-            elif entry.is_dir():
-                total_size += get_directory_size(entry.path)
-    return total_size / 1024 / 1024
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-def renamer(
-        path: str,
+def universal_renamer(
+        folder_path: str,
+        original_file_regex: str,
+        new_file_regex: str,
 ) -> None:
-    """
-    Rename folders in the specified directory based on a specific pattern.
-    Creates a dataframe with the new names, original names, sizes, and paths.
-    Renames the folders and saves the dataframe to the 'folder_list.xlsx'.
+    '''
+    Renames files in a folder and logs the changes.
+    This function walks through the specified folder and its subdirectories,
+    matches files based on the provided regular expression pattern, renames
+    the files using the replacement pattern, and logs the changes in an Excel
+    file named 'changelogger.xlsx'.
 
     Args:
-        path (str): The root directory path where the folders are located.
+        folder_path (str): Path to the folder containing files to rename.
+        original_file_regex (str): Regular expression pattern for matching original file names.
+        new_file_regex (str): Regular expression replacement pattern for new file names.
+    '''
+    changelogger = pd.DataFrame(columns=['Original_filename', 'Modified_filename'])
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            if re.match(original_file_regex, file):
+                new_file = re.sub(original_file_regex, new_file_regex, file)
+                old_path = os.path.join(root, file)
+                new_path = os.path.join(root, new_file)
+                print(f'Renaming: {old_path} -> {new_path}')
+                os.rename(old_path, new_path)
+                print(old_path, new_path)
+                changelogger = changelogger.append(
+                    pd.Series({'Original_filename': old_path, 'Modified_filename': new_path}),
+                    ignore_index=True
+                )
 
-    Returns:
-        None
-    """
-
-    df = pd.DataFrame(columns=['new_name', 'original_name', 'size', 'path'])
-    for i, folder in enumerate(os.listdir(path)):
-        if os.path.isdir(os.path.join(path, folder)):
-            fsize_mb = get_directory_size(os.path.join(path, folder))
-            fsize_mb = f'{fsize_mb:.0f} Mb'
-
-            fname = re.search(r'sheep\s*(\d+)', folder) or re.search(r'овца\s*(\d+)', folder)
-            if fname:
-                sheep = f'sheep_{int(fname.group(1)):02d}'
-            else:
-                sheep = 'sheep_NA'
-
-            df.loc[i] = [sheep, folder, fsize_mb, path]
-    df = df.sort_values(by=['new_name']).reset_index(drop=True)
-
-    for i, row in df.iterrows():
-        new_name = f'{(i + 1):03d}_{row.new_name}'
-        df['new_name'].loc[i] = new_name
-
-        old_name_path = os.path.join(row.path, row.original_name)
-        new_name_path = os.path.join(row.path, row.new_name)
-        os.rename(old_name_path, new_name_path)
-    path = os.path.join(path, 'folder_list.xlsx')
-    df.to_excel(path, index=False)
+    path = os.path.join(folder_path, 'changelogger.xlsx')
+    changelogger.to_excel(path, index=False)
 
 
 if __name__ == '__main__':
-    path = '/media/nii/SP PHD U3/test/source'
-    renamer(path=path)
+    folder_path = '/media/nii/LNB 1 5TB/dataset/markup_dataset_max_quality_v3.2'
+    original_file_regex = r'(\d+)_sheep_(?:\w+)_slide_(\d+)\.(\w+)'
+    new_file_regex = r'\1_\2.\3'
+
+    universal_renamer(
+        folder_path,
+        original_file_regex,
+        new_file_regex
+    )

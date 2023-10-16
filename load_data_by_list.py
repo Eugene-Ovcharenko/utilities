@@ -16,21 +16,24 @@ def dataloader(
     Generate an info file with class distribution.
 
     Args:
-        datalist_path (str): The path to the data list file (Excel format like 'data/data_list_v1.xlsx').
-        export_dir (str): The path to the export directory (like '/media/nii/SP PHD U3/dataset/markup_dataset').
+        datalist_path (str): The path to the data list file (Excel format like 'dATA/data_list_v3.2.xlsx').
+        export_dir (str): The path to the export directory (like '/media/nii/SP PHD U3/dataset/markup_dataset_max_quality_v3.2').
 
     Returns:
         None
     """
 
     df = pd.read_excel(datalist_path)
+    cols = df.columns[df.columns.str.contains('Dataset')]
+    print(f'Columns of dataset for load: {cols}')
+    df['Dataset'] = df[cols].apply(lambda row: ''.join(row.dropna().astype(str)), axis=1)
+    df['Dataset'].replace('', pd.NA, inplace=True)
     data_classes = df['Dataset'].value_counts()
     os.makedirs(export_dir, exist_ok=True)
     reminder = pd.Series({'remainder': df['Dataset'].isna().sum()})
     info = pd.concat([data_classes, reminder])
     info.to_excel(os.path.join(export_dir, 'info.xlsx'), index=True)
-    print(info)
-
+    print(f'Dataset info:\n{info}')
     df['file_dir'] = df['Path'].str.split('/').str[-1].str.extract(r'(\d{3}_sheep_.{2})')
     df['map'] = df['Dataset'].notna().astype(int)
 
@@ -75,7 +78,7 @@ def dataloader(
 
 
 if __name__ == '__main__':
-    datalist_path = 'data/data_list_v1.xlsx'
-    export_dir = '/media/nii/SP PHD U3/dataset/markup_dataset'
+    datalist_path = 'data/data_list_v3.2.xlsx'
+    export_dir = '/media/nii/LNB 1 5TB/dataset/markup_dataset_max_quality_v3.2'
 
     dataloader(datalist_path, export_dir)
